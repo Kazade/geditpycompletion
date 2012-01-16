@@ -19,10 +19,7 @@ Signals: keybinding-changed
 # this program; if not, write to the Free Software Foundation, Inc., 51
 # Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
-import gtk
-from gtk import gdk
-import gobject
-import pygtk
+from gi.repository import Gtk, Gdk, GObject
 import string
 
 import logging
@@ -35,19 +32,19 @@ WIDTH_CHARS = 18
 
 log = logging.getLogger(LOG_NAME)
 
-class KeybindingWidget(gtk.EventBox):
+class KeybindingWidget(Gtk.EventBox):
     def __init__(self):
-        gtk.EventBox.__init__(self)
+        Gtk.EventBox.__init__(self)
         log.info("Initializing KeybindingWidget.")
         
-        self._label = gtk.Label()
+        self._label = Gtk.Label()
         self._label.set_text(DEFAULT_TEXT)
         self._label.set_width_chars(WIDTH_CHARS)
         self._label.set_alignment(0.0, 0.5)
-        self._label.unset_flags(gtk.CAN_FOCUS)
+        self._label.set_can_focus(False)
         self.add(self._label)
         
-        events = gdk.BUTTON_PRESS_MASK | gdk.KEY_PRESS_MASK | gdk.FOCUS_CHANGE_MASK
+        events = Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.KEY_PRESS_MASK | Gdk.EventMask.FOCUS_CHANGE_MASK
         self.add_events(events)
         
         self.active = False
@@ -64,9 +61,9 @@ class KeybindingWidget(gtk.EventBox):
     def do_button_press_event(self, event):
         log.info("do_button_press_event()")
         log.info("Grabbing focus.")
-        self.set_flags(gtk.CAN_FOCUS)
+        self.set_can_focus(True)
         self.grab_focus()
-        self.modify_bg(gtk.STATE_NORMAL, gdk.color_parse(COLOR_FOCUS_IN))
+        self.modify_bg(Gtk.STATE_NORMAL, gdk.color_parse(COLOR_FOCUS_IN))
         self.active = True
 
     def do_key_press_event(self, event):
@@ -88,15 +85,15 @@ class KeybindingWidget(gtk.EventBox):
         if key_name == "space" or key_name == "Tab" \
             or key_name in string.ascii_letters:
             # Check for Ctrl
-            if event.state & gdk.CONTROL_MASK:
+            if event.state & Gdk.CONTROL_MASK:
                 log.info("Ctrl held down.")
                 keybinding.append("ctrl")
             # Check for Alt
-            if event.state & gdk.MOD1_MASK:
+            if event.state & Gdk.MOD1_MASK:
                 log.info("Alt held down.")
                 keybinding.append("alt")
             # Check for Shift
-            if event.state & gdk.SHIFT_MASK:
+            if event.state & Gdk.SHIFT_MASK:
                 log.info("Shift held down.")
                 keybinding.append("shift")
 
@@ -113,9 +110,9 @@ class KeybindingWidget(gtk.EventBox):
         
     def deactivate(self):
         # Revert color back to normal
-        default_bg_color = self.parent.get_style().bg[gtk.STATE_NORMAL]
-        self.modify_bg(gtk.STATE_NORMAL, default_bg_color)
-        self.unset_flags(gtk.CAN_FOCUS)
+        default_bg_color = self.parent.get_style().bg[Gtk.STATE_NORMAL]
+        self.modify_bg(Gtk.STATE_NORMAL, default_bg_color)
+        self.set_can_focus(False)
         self.active = False
         keybinding = self.getKeybinding()
         
@@ -125,11 +122,11 @@ class KeybindingWidget(gtk.EventBox):
             self._label.set_text(keybinding)
         
 
-gobject.type_register(KeybindingWidget)
-gobject.signal_new("keybinding-changed", KeybindingWidget,
-                       gobject.SIGNAL_RUN_LAST,
-                       gobject.TYPE_NONE,
-                       (gobject.TYPE_PYOBJECT,))
+GObject.type_register(KeybindingWidget)
+GObject.signal_new("keybinding-changed", KeybindingWidget,
+                       GObject.SIGNAL_RUN_LAST,
+                       GObject.TYPE_NONE,
+                       (GObject.TYPE_PYOBJECT,))
 
 # Tests below
 
@@ -141,20 +138,20 @@ if __name__ == '__main__':
     logging.basicConfig()
     log.setLevel(logging.DEBUG)
 
-    win = gtk.Window()
+    win = Gtk.Window()
     win.set_border_width(5)
     win.set_title('KeybindingWidget test')
-    win.connect('delete-event', gtk.main_quit)
+    win.connect('delete-event', Gtk.main_quit)
 
-    hbox = gtk.HBox(homogeneous=False, spacing=4)
+    hbox = Gtk.HBox(homogeneous=False, spacing=4)
     win.add(hbox)
 
-    table = gtk.Table(2, 2, homogeneous=False)
+    table = Gtk.Table(2, 2, homogeneous=False)
     table.set_row_spacings(4)
     table.set_col_spacings(4)
-    hbox.pack_start(table)
+    hbox.pack_start(table, False, False, 0)
 
-    lblKeybinding = gtk.Label()
+    lblKeybinding = Gtk.Label()
     lblKeybinding.set_text("Keybinding:")
     # Put in upper left quadrant
     table.attach(lblKeybinding, 0, 1, 0, 1, xoptions=False, yoptions=False)
@@ -164,15 +161,15 @@ if __name__ == '__main__':
     table.attach(kbind, 1, 2, 0, 1, xoptions=False, yoptions=False)
     kbind.connect("keybinding-changed", on_keybinding_changed)
 
-    lblStuff = gtk.Label()
+    lblStuff = Gtk.Label()
     lblStuff.set_text("Enter stuff:")
     # Put in lower left quadrant
     table.attach(lblStuff, 0, 1, 1, 2, xoptions=False, yoptions=False)
     
-    entryStuff = gtk.Entry()
+    entryStuff = Gtk.Entry()
     # Put in lower right quadrant
     table.attach(entryStuff, 1, 2, 1, 2, xoptions=False, yoptions=False)
     
     win.show_all()
 
-    gtk.main()
+    Gtk.main()

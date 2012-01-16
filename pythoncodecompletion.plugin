@@ -1,0 +1,10 @@
+[Plugin]
+Loader=python
+Module=pythoncodecompletion
+IAge=3
+Name=Python Code Completion
+Description=Complete python code with Ctrl+Alt+Space key combination
+Authors=Rodrigo Pinheiro Marques de Araujo (Fenrrir) <fenrrir@gmail.com>, Luke Benstead <kazade@gmail.com>
+Copyright=Copyright (C) 2006-2007 Osmo Salomaa / 2008 Rodrigo Pinheiro Marques de Araujo / Copyright © 2011 Luke Benstead
+Website=https://github.com/lukebpotato/geditpycompletion
+Version=3.0.0

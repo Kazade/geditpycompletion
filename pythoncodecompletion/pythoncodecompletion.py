@@ -19,22 +19,19 @@
 
 """Complete python code with Ctrl+Alt+Space key combination."""
 
-
-import gedit
-import gobject
-import gtk
+from gi.repository import GObject, Gedit, Gtk, Gdk, PeasGtk
 import re
 from complete import complete
+#import configuration
 import configurationdialog
-import configuration
+import logging
 
-class CompletionWindow(gtk.Window):
+class CompletionWindow(Gtk.Window):
 
     """Window for displaying a list of completions."""
 
     def __init__(self, parent, callback):
-
-        gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
+        Gtk.Window.__init__(self, type=Gtk.WindowType.TOPLEVEL)
         self.set_decorated(False)
         self.store = None
         self.view = None
@@ -42,8 +39,8 @@ class CompletionWindow(gtk.Window):
         self.complete_callback = callback
         self.set_transient_for(parent)
         self.set_border_width(1)
-        self.text = gtk.TextView()
-        self.text_buffer = gtk.TextBuffer()
+        self.text = Gtk.TextView()
+        self.text_buffer = Gtk.TextBuffer()
         self.text.set_buffer(self.text_buffer)
         self.text.set_size_request(300, 200)
         self.text.set_sensitive(False)
@@ -55,15 +52,15 @@ class CompletionWindow(gtk.Window):
 
     
     def key_press_event(self, widget, event):
-        if event.keyval == gtk.keysyms.Escape:
+        if event.keyval == Gtk.keysyms.Escape:
             self.hide()
-        elif event.keyval == gtk.keysyms.BackSpace:
+        elif event.keyval == Gtk.keysyms.BackSpace:
             self.hide()
-        elif event.keyval in (gtk.keysyms.Return, gtk.keysyms.Tab):
+        elif event.keyval in (Gtk.keysyms.Return, Gtk.keysyms.Tab):
             self.complete()
-        elif event.keyval == gtk.keysyms.Up:
+        elif event.keyval == Gtk.keysyms.Up:
             self.select_previous()
-        elif event.keyval == gtk.keysyms.Down:
+        elif event.keyval == Gtk.keysyms.Down:
             self.select_next()
 
     def complete(self):
@@ -81,16 +78,16 @@ class CompletionWindow(gtk.Window):
     def init_frame(self):
         """Initialize the frame and scroller around the tree view."""
 
-        scroller = gtk.ScrolledWindow()
-        scroller.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_NEVER)
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
         scroller.add(self.view)
-        frame = gtk.Frame()
-        frame.set_shadow_type(gtk.SHADOW_OUT)
-        hbox = gtk.HBox()
+        frame = Gtk.Frame()
+        frame.set_shadow_type(Gtk.ShadowType.OUT)
+        hbox = Gtk.HBox()
         hbox.add(scroller)
 
-        scroller_text = gtk.ScrolledWindow() 
-        scroller_text.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        scroller_text = Gtk.ScrolledWindow() 
+        scroller_text.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         scroller_text.add(self.text)
         hbox.add(scroller_text)
         frame.add(hbox)
@@ -99,16 +96,16 @@ class CompletionWindow(gtk.Window):
     def init_tree_view(self):
         """Initialize the tree view listing the completions."""
 
-        self.store = gtk.ListStore(gobject.TYPE_STRING)
-        self.view = gtk.TreeView(self.store)
-        renderer = gtk.CellRendererText()
-        column = gtk.TreeViewColumn("", renderer, text=0)
+        self.store = Gtk.ListStore(GObject.TYPE_STRING)
+        self.view = Gtk.TreeView(self.store)
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn("", renderer, text=0)
         self.view.append_column(column)
         self.view.set_enable_search(False)
         self.view.set_headers_visible(False)
         self.view.set_rules_hint(True)
         selection = self.view.get_selection()
-        selection.set_mode(gtk.SELECTION_SINGLE)
+        selection.set_mode(Gtk.SelectionMode.SINGLE)
         self.view.set_size_request(200, 200)
         self.view.connect('row-activated', self.row_activated)
 
@@ -154,34 +151,39 @@ class CompletionWindow(gtk.Window):
         self.view.modify_font(font_desc)
 
 
-class CompletionPlugin(gedit.Plugin):
+class CompletionPlugin(GObject.Object, Gedit.WindowActivatable, PeasGtk.Configurable):
 
     """Complete python code with the tab key."""
 
+    __gtype_name__ = "CompletionPlugin"
+    window = GObject.property(type=Gedit.Window)
+    
     re_alpha = re.compile(r"\w+", re.UNICODE | re.MULTILINE)
     re_non_alpha = re.compile(r"\W+", re.UNICODE | re.MULTILINE)
 
     def __init__(self):
-
-        gedit.Plugin.__init__(self)
+        print("Constructing plugin")
+        
+        GObject.Object.__init__(self)
+        
         self.completes = None
         self.completions = None
-        self.name = "CompletionPlugin"
         self.popup = None
-        self.window = None
+        self.name = "CompletionPlugin"
 
-    def activate(self, window):
+    def do_activate(self):
         """Activate plugin."""
-
-        self.window = window
-        self.popup = CompletionWindow(window, self.complete)
+        print("Activating plugin")
+        
+        self.popup = CompletionWindow(self.window, self.complete)
         handler_ids = []
-        callback = self.on_window_tab_added
-        handler_id = window.connect("tab-added", callback)
+        callback = self.on_tab_added
+        handler_id = self.window.connect("tab-added", callback)
         handler_ids.append(handler_id)
-        window.set_data(self.name, handler_ids)
-        for view in window.get_views():
+        self.window.set_data(self.name, handler_ids)
+        for view in self.window.get_views():
             self.connect_view(view)
+        print("Activation complete")
 
     def cancel(self):
         """Hide the completion window and return False."""
@@ -206,17 +208,17 @@ class CompletionPlugin(gedit.Plugin):
         handler_ids.append(handler_id)
         view.set_data(self.name, handler_ids)
 
-    def create_configure_dialog(self):
+    def do_create_configure_widget(self):
         """Creates and displays a ConfigurationDialog."""
         dlg = configurationdialog.ConfigurationDialog()
         return dlg
 
-    def deactivate(self, window):
+    def do_deactivate(self):
         """Deactivate plugin."""
 
-        widgets = [window]
-        widgets.append(window.get_views())
-        widgets.append(window.get_documents())
+        widgets = [self.window]
+        widgets.append(self.window.get_views())
+        widgets.append(self.window.get_documents())
         for widget in widgets:
             handler_ids = widget.get_data(self.name)
             for handler_id in handler_ids:
@@ -224,7 +226,6 @@ class CompletionPlugin(gedit.Plugin):
             widget.set_data(self.name, None)
         self.hide_popup()
         self.popup = None
-        self.window = None
 
     def display_completions(self, view, event):
         """Find completions and display them."""
@@ -237,7 +238,7 @@ class CompletionPlugin(gedit.Plugin):
             if not self.re_alpha.match(char) and not char == ".":
                 start.forward_char()
                 break
-        incomplete = unicode(doc.get_text(start, insert))
+        incomplete = unicode(doc.get_text(start, insert, True))
         incomplete += unicode(event.string)
         if incomplete.isdigit():
             return self.cancel()
@@ -256,7 +257,7 @@ class CompletionPlugin(gedit.Plugin):
             length = len(incomplete)
         for x in completes:
             x['completion'] = x['abbr'][length:]
-        window = gtk.TEXT_WINDOW_TEXT
+        window = Gtk.TextWindowType.TEXT
         rect = view.get_iter_location(insert)
         x, y = view.buffer_to_window_coords(window, rect.x, rect.y)
         x, y = view.translate_coordinates(self.window, x, y)
@@ -284,10 +285,10 @@ class CompletionPlugin(gedit.Plugin):
         #  The "Alt"-key might be mapped to something else
         # TODO Find out which keybinding are already in use.
         keybinding = configuration.getKeybindingCompleteTuple()
-        ctrl_pressed = (event.state & gtk.gdk.CONTROL_MASK) == gtk.gdk.CONTROL_MASK
-        alt_pressed = (event.state & gtk.gdk.MOD1_MASK) == gtk.gdk.MOD1_MASK
-        shift_pressed = (event.state & gtk.gdk.SHIFT_MASK) == gtk.gdk.SHIFT_MASK
-        keyval = gtk.gdk.keyval_from_name(keybinding[configuration.KEY])
+        ctrl_pressed = (event.state & Gdk.ModifierType.CONTROL_MASK) == Gdk.ModifierType.CONTROL_MASK
+        alt_pressed = (event.state & Gdk.ModifierType.MOD1_MASK) == Gdk.ModifierType.MOD1_MASK
+        shift_pressed = (event.state & Gdk.ModifierType.SHIFT_MASK) == Gdk.ModifierType.SHIFT_MASK
+        keyval = Gdk.keyval_from_name(keybinding[configuration.KEY])
         key_pressed = (event.keyval == keyval)
 
         # It's ok if a key is pressed and it's needed or
@@ -296,12 +297,12 @@ class CompletionPlugin(gedit.Plugin):
         alt_ok =  not (keybinding[configuration.MODIFIER_ALT] ^ alt_pressed )
         shift_ok = not (keybinding[configuration.MODIFIER_SHIFT] ^ shift_pressed )
 
-        if ctrl_ok and alt_ok and shift_ok and key_pressed or event.keyval == gtk.keysyms.period:
+        if ctrl_ok and alt_ok and shift_ok and key_pressed or event.keyval == Gdk.KEY_period:
             return self.display_completions(view, event)
         
         return self.cancel()
 
-    def on_window_tab_added(self, window, tab):
+    def on_tab_added(self, window, tab, data=None):
         """Connect the document and view in tab."""
 
         context = tab.get_view().get_pango_context()

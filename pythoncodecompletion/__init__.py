@@ -17,5 +17,4 @@
 
 """Load the python code completion plugin"""
 
-import pythoncodecompletion
-from pythoncodecompletion import CompletionPlugin
+from .pythoncodecompletion import CompletionPlugin

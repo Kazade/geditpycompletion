@@ -13,8 +13,8 @@
 # You should have received a copy of the GNU General Public License along with
 # this program; if not, write to the Free Software Foundation, Inc., 51
 # Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-import gtk
-import gtk.gdk
+
+from gi.repository import Gtk, GObject, Gdk
 import logging
 import keybindingwidget
 import configuration
@@ -27,9 +27,9 @@ LOG_NAME = "ConfigurationDialog"
 
 log = logging.getLogger(LOG_NAME)
 
-class ConfigurationDialog(gtk.Dialog):
+class ConfigurationDialog(Gtk.Dialog):
     def __init__(self):
-        gtk.Dialog.__init__(self)
+        Gtk.Dialog.__init__(self)
         self.set_border_width(5)
         self.set_title(TEXT_TITLE)
         self.set_default_size(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
@@ -38,12 +38,12 @@ class ConfigurationDialog(gtk.Dialog):
         log.info("Got keybinding from gconf %s" % str(keybinding))
         self.__setKeybinding(keybinding)
         
-        self.table = gtk.Table(2, 2, homogeneous=False)
+        self.table = Gtk.Table(2, 2, homogeneous=False)
         self.table.set_row_spacings(4)
         self.table.set_col_spacings(4)
         self.vbox.pack_start(self.table, expand=False, fill=False, padding=4) 
         
-        lblKeybinding = gtk.Label()
+        lblKeybinding = Gtk.Label()
         lblKeybinding.set_text(TEXT_KEYBINDING)
         self.table.attach(lblKeybinding, 0, 1, 0, 1, xoptions=False, yoptions=False)        
         
@@ -52,10 +52,10 @@ class ConfigurationDialog(gtk.Dialog):
         self.table.attach(self.__kbWidget, 1, 2, 0, 1, xoptions=False, yoptions=False)
         
         # Buttons in the action area
-        btnClose = gtk.Button(stock=gtk.STOCK_CLOSE)
-        self.__btnApply = gtk.Button(stock=gtk.STOCK_APPLY)
+        btnClose = Gtk.Button(stock=Gtk.STOCK_CLOSE)
+        self.__btnApply = Gtk.Button(stock=Gtk.STOCK_APPLY)
         self.__btnApply.set_sensitive(False)
-        btnClear =  gtk.Button(stock=gtk.STOCK_CLEAR)
+        btnClear =  Gtk.Button(stock=Gtk.STOCK_CLEAR)
         self.action_area.add(btnClear)
         self.action_area.add(self.__btnApply)
         self.action_area.add(btnClose)
@@ -110,4 +110,4 @@ if __name__ == '__main__':
     
     dlg = ConfigurationDialog()
 
-    gtk.main()
+    Gtk.main()
