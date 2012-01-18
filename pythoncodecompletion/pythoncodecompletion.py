@@ -18,7 +18,7 @@
 
 from gi.repository import GObject, Gedit, Gtk, GtkSource
 import re
-from complete import complete
+from code_complete import complete
 
 class PythonCompletionProvider(GObject.Object, GtkSource.CompletionProvider):
     __gtype_name__ = 'PythonCompletionProvider'
@@ -42,13 +42,13 @@ class PythonCompletionProvider(GObject.Object, GtkSource.CompletionProvider):
 
         while start.backward_char():
             char = unicode(start.get_char())
-            if not self.re_alpha.match(char):# and not char == ".":
+            if not self.re_alpha.match(char) and not char == ".":
                 start.forward_char()
                 break
 
         incomplete = unicode(doc.get_text(start, insert, True))
         if not incomplete:
-            return
+            return []
         
         print "Finding match for: " + incomplete
         if incomplete.isdigit():
@@ -84,7 +84,7 @@ class PythonCompletionProvider(GObject.Object, GtkSource.CompletionProvider):
         context.add_proposals(self, proposals, True)
         
     def do_match(self, context):
-        return True
+        return context.get_iter().get_buffer().get_mime_type() == 'text/x-python'
 
     def do_get_priority(self):
         print "get_priority"
@@ -140,8 +140,8 @@ class CompletionPlugin(GObject.Object, Gedit.WindowActivatable):
         """Deactivate plugin."""
 
         widgets = [self.window]
-        widgets.append(self.window.get_views())
-        widgets.append(self.window.get_documents())
+        widgets.extend(self.window.get_views())
+        widgets.extend(self.window.get_documents())
         for widget in widgets:
             handler_ids = widget.get_data(self.name)
             for handler_id in handler_ids:
