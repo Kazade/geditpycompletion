@@ -25,6 +25,7 @@ class Scope(object):
 
         self.children = {}
 
+
 class ObjectScope(Scope):
     def __init__(self, parent):
         super(ObjectScope, self).__init__("object", ScopeType.CLASS, parent=parent)
@@ -210,7 +211,7 @@ class FileParser(object):
                 break
             i += 1
                 
-        is_assignment_to_member = tokens[0][1] == "self"
+        is_assignment_to_member = lvalue == "self"
         
         scope = self._current_scope
         
@@ -229,21 +230,25 @@ class FileParser(object):
                     return 
                 else:
                     scope = class_scope
-            else:
-                if len(lvalue_tokens) == 1:
-                    scope.variables.add(lvalue_tokens[0][1])
-                    if rvalue_tokens[0][1] == "[":
-                        scope.children[lvalue_tokens[0][1]] = ListScope(self._current_scope)
-                    elif rvalue_tokens[0][1] == "(":
-                        scope.children[lvalue_tokens[0][1]] = TupleScope(self._current_scope)
-                    elif rvalue_tokens[0][1] == "{":
-                        scope.children[lvalue_tokens[0][1]] = DictScope(self._current_scope)                        
-                    elif rvalue_tokens[0][0] == tokenize.NUMBER:
-                        scope.children[lvalue_tokens[0][1]] = IntScope(self._current_scope)
-                    elif rvalue_tokens[0][0] == tokenize.STRING:
-                        scope.children[lvalue_tokens[0][1]] = StrScope(self._current_scope)
+
+            if len(lvalue_tokens) == 1 or is_assignment_to_member:
+                if is_assignment_to_member:
+                    lvalue_name = lvalue_tokens[2][1] # [ 'self', '.', 'something' ]
                 else:
-                    print "TODO: Handle assignment: ", lvalue_tokens, "=", rvalue_tokens
+                    lvalue_name = lvalue_tokens[0][1]
+                scope.variables.add(lvalue_name)
+                if rvalue_tokens[0][1] == "[":
+                    scope.children[lvalue_name] = ListScope(self._current_scope)
+                elif rvalue_tokens[0][1] == "(":
+                    scope.children[lvalue_name] = TupleScope(self._current_scope)
+                elif rvalue_tokens[0][1] == "{":
+                    scope.children[lvalue_name] = DictScope(self._current_scope)                        
+                elif rvalue_tokens[0][0] == tokenize.NUMBER:
+                    scope.children[lvalue_name] = IntScope(self._current_scope)
+                elif rvalue_tokens[0][0] == tokenize.STRING:
+                    scope.children[lvalue_name] = StrScope(self._current_scope)
+            else:
+                print "TODO: Handle assignment: ", lvalue_tokens, "=", rvalue_tokens
 
     def _find_parent_scope_of_type(self, scope_type):
         current = self._current_scope
@@ -266,7 +271,7 @@ class FileParser(object):
         buf = StringIO(file_contents)
         self._gen = tokenize.generate_tokens(buf.readline)
         
-        in_block_without_scope = False
+        in_block_without_scope = 0
         while True:
             try:
                 tok_type, token, (lineno, indent), end, line = self._gen.next()
@@ -278,7 +283,8 @@ class FileParser(object):
                 if tok_type == DEDENT:
                     if in_block_without_scope:
                         print "skipping dedent"
-                        in_block_without_scope = False
+                        in_block_without_scope -= 1
+                        continue
                     else:                
                         print "dedenting"
                         self._dedent()
@@ -292,25 +298,30 @@ class FileParser(object):
                     last_line_incomplete = not self._parse_class()
                 elif token == "def":
                     last_line_incomplete = not self._parse_method()
+                elif token == "print":
+                    self._parse_to_end()
                 elif token == "with":
                     self._parse_with()
-                    in_block_without_scope = True
-                elif token == "if":
+                    in_block_without_scope += 1
+                elif token == "while":
+                    self._parse_to_end()
+                    in_block_without_scope += 1
+                elif token in ("if", "else", "elif"):
                     tokens = self._parse_to_end()
-                    in_block_without_scope = True
-                elif token == "@": #Ignore decorator FIXME: should add decorator as a method to the current scope
+                    in_block_without_scope += 1
+                elif token == "return":
                     self._parse_to_end()
                 elif token == "try":
                     tokens = self._parse_to_end()
-                    in_block_without_scope = True
+                    in_block_without_scope += 1
                 elif token == "except":
                     tokens = self._parse_to_end()
-                    in_block_without_scope = True                    
+                    in_block_without_scope += 1
                 elif token == "for":
                     tokens = self._parse_to_end()
-                    in_block_without_scope = True                                        
+                    in_block_without_scope += 1
                 elif token in keyword.kwlist:
-                    print "Unhandled keyword: " + token
+                    print "Unhandled keyword: '" + token + "'"
                     self._parse_to_end()
                 else:
                     if token.strip():
