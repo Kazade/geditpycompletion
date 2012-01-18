@@ -25,7 +25,6 @@ class Scope(object):
 
         self.children = {}
 
-
 class ObjectScope(Scope):
     def __init__(self, parent):
         super(ObjectScope, self).__init__("object", ScopeType.CLASS, parent=parent)
@@ -165,19 +164,31 @@ class FileParser(object):
         print "New scope: " + self._current_scope.name
 
         tokens = self._parse_to_end()
+        
+        tokens = [ x for x in tokens if x[1] not in ("(", ",", ")", ":") ]
+
+
+        if not tokens: 
+            return
+
+        class_scope = self._find_parent_scope_of_type(ScopeType.CLASS)
+        if class_scope: #This is a method that has a parent class
+            #Grab the first argument (normally "self")
+            first_token_type, first_token = tokens[0]            
+            
+            tokens = tokens[1:] #Remove from the tokens list
+            print "CLASS VAR: ", class_scope.name, first_token
+            
+            #add it to the variables list
+            self._current_scope.variables.add(first_token)
+            #set the scope for the variable as that of the parent class (so self.whatever works)
+            self._current_scope.children[first_token] = class_scope
+        
+        #The type of all other args are anybody's guess, so just treat them as "object"s
         for tok_type, token in tokens:
-            if token in ("(", ",", ")"):
-                continue
-            elif token == "self":
-                self._current_scope.variables.add(token)
-                class_scope = self._find_parent_scope_of_type(ScopeType.CLASS)
-                self_scope = class_scope
-                if self_scope:
-                    self._current_scope.children["self"] = self_scope
-            else:
-                #generic object scope
-                self._current_scope.children[token] = ObjectScope(parent=self._current_scope)
-                self._current_scope.variables.add(token)
+            #generic object scope
+            self._current_scope.children[token] = ObjectScope(parent=self._current_scope)
+            self._current_scope.variables.add(token)
 
     def _parse_with(self):
         while True:
