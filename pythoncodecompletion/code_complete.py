@@ -94,6 +94,7 @@ class DictScope(Scope):
                 
 class FileParser(object):
     def __init__(self, file_contents, current_line=None):
+    	self._line_no = 0
         self._global = Scope("__global__", ScopeType.MODULE)
         self._current_scope = self._global
         self._current_line = current_line
@@ -104,7 +105,7 @@ class FileParser(object):
         tokens = []
         ignore_rest = False
         while True:
-            tok_type, token, (lineno, indent), end, line = self._gen.next()
+            tok_type, token, line = self._get_next_token()
             
             if tok_type == tokenize.COMMENT:
                 ignore_rest = True
@@ -117,7 +118,7 @@ class FileParser(object):
         return tokens
     
     def _parse_class(self):
-        type, token, (lineno, indent), end, line = self._gen.next()
+        tok_type, token, line = self._get_next_token()
         
         class_name = token
         print "Found class: " + class_name
@@ -151,7 +152,7 @@ class FileParser(object):
                 self._dedent()
 
     def _parse_method(self):
-        type, token, (lineno, indent), end, line = self._gen.next()
+        tok_type, token, line = self._get_next_token()
 
         method_name = token
         print "Found method: " + method_name
@@ -192,13 +193,13 @@ class FileParser(object):
 
     def _parse_with(self):
         while True:
-            tok_type, token, (lineno, indent), end, line = self._gen.next()
+            tok_type, token, line = self._get_next_token()
             if tok_type == NEWLINE:
-                break;
+                break
                 
             #If we find the "as" token, we know the next token is the variable name
             if token == "as":
-                tok_type, token, (lineno, indent), end, line = self._gen.next()
+                tok_type, token, line = self._get_next_token()
                 if tok_type == NEWLINE:
                     break;
                 self._current_scope.variables.add(token)
@@ -276,6 +277,14 @@ class FileParser(object):
             self._current_scope = self._current_scope.parent
             print "New scope: " + self._current_scope.name    
     
+    def _get_next_token(self):
+        tok_type, token, (lineno, indent), end, line = self._gen.next()    	
+        if token == "\n" or token == tokenize.NEWLINE: 
+            self._line_no += 1
+		
+        print self._line_no, "DEDENT" if tok_type == tokenize.DEDENT else token, line
+        return tok_type, token, line
+    
     def _do_parse(self, file_contents):
         import keyword
         
@@ -283,12 +292,14 @@ class FileParser(object):
         self._gen = tokenize.generate_tokens(buf.readline)
         
         in_block_without_scope = 0
+        self._line_no = 0
+        
         while True:
             try:
-                tok_type, token, (lineno, indent), end, line = self._gen.next()
-                print token
+                tok_type, token, line = self._get_next_token()
+                                
 #                print line, lineno, self._current_line
-                if self._current_line == lineno:
+                if self._current_line == self._line_no:
                     self._active_scope = self._current_scope
 
                 if tok_type == DEDENT:
@@ -300,10 +311,13 @@ class FileParser(object):
                         print "dedenting"
                         self._dedent()
                         continue
-
+                
                 if token == "pass":
                     continue
                 elif token == "#" or tok_type == tokenize.COMMENT:
+                    self._parse_to_end()
+                elif tok_type == tokenize.STRING:
+                    self._line_no += token.count("\n")
                     self._parse_to_end()
                 elif token == "class":
                     last_line_incomplete = not self._parse_class()
@@ -319,7 +333,14 @@ class FileParser(object):
                     in_block_without_scope += 1
                 elif token in ("if", "else", "elif"):
                     tokens = self._parse_to_end()
-                    in_block_without_scope += 1
+                    block_finished = False
+                    if ":" in tokens:
+                        colon_idx = tokens.index(":")
+                        tokens_after_colon = [ x for x in tokens[colon_idx:] if x not in ("\n",) ]
+                        if len(tokens_after_colon):
+                            block_finished = True 
+                    if not block_finished:
+                        in_block_without_scope += 1
                 elif token == "return":
                     self._parse_to_end()
                 elif token == "try":
@@ -357,6 +378,11 @@ class Completer(object):
         self._active_parser = name
     
     def get_completions(self, match):
+    	"""
+    		Get the completions for match, using the location of the
+    		current_line to detect the current scope
+    	"""
+    	
         print("Completing: " + match)
         
         parser = self._parsers[self._active_parser]
@@ -411,7 +437,7 @@ def complete(file_content, match, line):
     c = Completer()
     c.parse_file("test", file_content, line)
     return [ { 'abbr' : x } for x in c.get_completions(match) ]
-    
+
 if __name__ == '__main__':
     sample = """
     class A(object):
