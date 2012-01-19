@@ -138,13 +138,12 @@ class FileParser(object):
         tok_type, token, line = self._get_next_token()
         
         class_name = token
-        print "Found class: " + class_name
         self._current_scope.types.add(class_name) #Store this class as a type
         
         class_scope = Scope(token, ScopeType.CLASS, parent=self._current_scope)
         self._current_scope.children[class_name] = class_scope
         self._current_scope = class_scope
-        print "New scope: " + self._current_scope.name        
+        print "New scope: %s at line %s" % (self._current_scope.name, self._line_no)
         tokens = self._parse_to_end()
 
         #We have an open bracket, this means the class has parents
@@ -172,14 +171,13 @@ class FileParser(object):
         tok_type, token, line = self._get_next_token()
 
         method_name = token
-        print "Found method: " + method_name
         self._current_scope.methods.add(method_name) #Store this class as a type
         
         method_scope = Scope(token, ScopeType.METHOD, parent=self._current_scope)
         self._current_scope.children[method_name] = method_scope
         self._current_scope = method_scope
         
-        print "New scope: " + self._current_scope.name
+        print "New scope: %s at line %s" % (self._current_scope.name, self._line_no)
 
         tokens = self._parse_to_end()
         
@@ -224,7 +222,7 @@ class FileParser(object):
         
         self._parse_to_end()
 
-        
+
     def _parse_statement(self, lvalue_type, lvalue):
         """ FIXME handle multiple lvalues"""
         
@@ -292,14 +290,15 @@ class FileParser(object):
     def _dedent(self):
         if self._current_scope.parent:
             self._current_scope = self._current_scope.parent
-            print "New scope: " + self._current_scope.name    
+            print "New scope: %s at line %s" % (self._current_scope.name, self._line_no)
     
     def _get_next_token(self):
         tok_type, token, (lineno, indent), end, line = self._gen.next()    	
-        if token == "\n" or token == tokenize.NEWLINE: 
+        if token == "\n" or tok_type == tokenize.NEWLINE: 
             self._line_no += 1
-		
-        print self._line_no, "DEDENT" if tok_type == tokenize.DEDENT else token, line
+        elif "\n" in token:
+            self._line_no += token.count("\n")
+
         return tok_type, token, line
     
     def _do_parse(self, file_contents):
@@ -334,7 +333,7 @@ class FileParser(object):
                 elif token == "#" or tok_type == tokenize.COMMENT:
                     self._parse_to_end()
                 elif tok_type == tokenize.STRING:
-                    self._line_no += token.count("\n")
+                    #self._line_no += token.count("\n")
                     self._parse_to_end()
                 elif token == "class":
                     last_line_incomplete = not self._parse_class()
@@ -345,16 +344,14 @@ class FileParser(object):
                 elif token == "with":
                     self._parse_with()
                     in_block_without_scope += 1
-                elif token == "while":
-                    self._parse_to_end()
-                    in_block_without_scope += 1
-                elif token in ("if", "else", "elif"):
-                    tokens = self._parse_to_end()
+                elif token in ("if", "else", "elif", "while"):
+                    tokens = [ x[1] for x in self._parse_to_end() ]
                     block_finished = False
                     if ":" in tokens:
                         colon_idx = tokens.index(":")
-                        tokens_after_colon = [ x for x in tokens[colon_idx:] if x not in ("\n",) ]
+                        tokens_after_colon = [ x for x in tokens[colon_idx+1:] if x not in ("\n",) ]
                         if len(tokens_after_colon):
+                            print "IF LINE: ", tokens_after_colon
                             block_finished = True 
                     if not block_finished:
                         in_block_without_scope += 1
@@ -443,10 +440,10 @@ class Completer(object):
                 if match in all_possible:
                     all_possible.remove(match) #Don't include the match
             else:
-
                 for possible in all_possible:
-                    if possible.startswith(part) or not part.strip():
+                    if possible.startswith(part):
                         matches.append(possible)
+                break
                         
         return sorted(list(set(matches)))
 
