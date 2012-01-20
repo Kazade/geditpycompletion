@@ -20,6 +20,9 @@
 
 from StringIO import StringIO
 import tokenize
+import keyword
+import __builtin__
+
 from token import DEDENT, NEWLINE
 
 class ScopeType:
@@ -34,14 +37,36 @@ class Scope(object):
         self.parent = parent
         
         self.variables = set()
-        self.methods = set()
-        self.types = set()
-        self.keywords = set()
+        self.methods = set([ x for x in dir(__builtin__) if __builtins__.get(x).__class__ == isinstance.__class__ ])
+        self.types = set([ x for x in dir(__builtin__) if isinstance(__builtins__.get(x), type) ])
+        self.keywords = set(keyword.kwlist)
         self.modules = set()
-        self.imported_scopes = set()
+        self.inherited_scopes = set()
 
         self.children = {}
+        
+    def inherit(self, scope):
+        import copy
+        self.inherited_scopes.add(copy.deepcopy(scope))
 
+    def get_variables(self):
+        result = list(self.variables)
+        for scope in self.inherited_scopes:
+            result.extend(scope.get_variables())
+        return set(result)
+    
+    def get_methods(self):
+        result = list(self.methods)
+        for scope in self.inherited_scopes:
+            result.extend(scope.get_methods())
+        return set(result)
+    
+    def get_types(self):
+        result = list(self.types)
+        for scope in self.inherited_scopes:
+            result.extend(scope.get_types())
+        return set(result)        
+    
 class ObjectScope(Scope):
     def __init__(self, parent):
         super(ObjectScope, self).__init__("object", ScopeType.CLASS, parent=parent)
@@ -52,6 +77,8 @@ class ObjectScope(Scope):
         
         self.variables = set(variables)
         self.methods = set(methods)
+        self.types = set()
+        self.keywords = set()
 
 class ListScope(Scope):
     def __init__(self, parent):
@@ -138,9 +165,8 @@ class FileParser(object):
         tok_type, token, line = self._get_next_token()
         
         class_name = token
-        self._current_scope.types.add(class_name) #Store this class as a type
-        
         class_scope = Scope(token, ScopeType.CLASS, parent=self._current_scope)
+        self._current_scope.types.add(class_name) #Store this class as a type
         self._current_scope.children[class_name] = class_scope
         self._current_scope = class_scope
         print "New scope: %s at line %s" % (self._current_scope.name, self._line_no)
@@ -157,7 +183,7 @@ class FileParser(object):
                 if token == ")": break
                 if token == ",": continue
                 
-                self._current_scope.imported_scopes.add(token)
+                self._current_scope.inherited_scopes.add(token)
 
         #If at this point tokens[0] is a colon, we need to check and see if there are any other statements
         #after it, if so, we need to dedent
@@ -171,9 +197,10 @@ class FileParser(object):
         tok_type, token, line = self._get_next_token()
 
         method_name = token
-        self._current_scope.methods.add(method_name) #Store this class as a type
         
         method_scope = Scope(token, ScopeType.METHOD, parent=self._current_scope)
+            
+        self._current_scope.methods.add(method_name) #Store this class as a type        
         self._current_scope.children[method_name] = method_scope
         self._current_scope = method_scope
         
@@ -302,8 +329,6 @@ class FileParser(object):
         return tok_type, token, line
     
     def _do_parse(self, file_contents):
-        import keyword
-        
         buf = StringIO(file_contents)
         self._gen = tokenize.generate_tokens(buf.readline)
         
@@ -357,6 +382,7 @@ class FileParser(object):
                         in_block_without_scope += 1
                 elif token == "return":
                     self._parse_to_end()
+                    in_block_without_scope += 1
                 elif token == "try":
                     tokens = self._parse_to_end()
                     in_block_without_scope += 1
@@ -405,9 +431,9 @@ class Completer(object):
         parts = match.split(".")
         all_possible = set()
         print "Scope: " + scope_at_line.name
-        all_possible.update(scope_at_line.variables)
-        all_possible.update(scope_at_line.methods)
-        all_possible.update(scope_at_line.types)        
+        all_possible.update(scope_at_line.get_variables())
+        all_possible.update(scope_at_line.get_methods())
+        all_possible.update(scope_at_line.get_types())        
     
         if match in all_possible:
             all_possible.remove(match) #Don't include the match
@@ -415,9 +441,9 @@ class Completer(object):
         matches = []
         
         global_matches = set()                
-        global_matches.update(parser.get_global_scope().variables)
-        global_matches.update(parser.get_global_scope().methods)
-        global_matches.update(parser.get_global_scope().types)
+        global_matches.update(parser.get_global_scope().get_variables())
+        global_matches.update(parser.get_global_scope().get_methods())
+        global_matches.update(parser.get_global_scope().get_types())
         
         if match in global_matches:
             global_matches.remove(match) #Don't include the match        
@@ -433,9 +459,9 @@ class Completer(object):
                 matches = []
                 
                 all_possible = set()
-                all_possible.update(scope_at_line.variables)
-                all_possible.update(scope_at_line.methods)
-                all_possible.update(scope_at_line.types)                
+                all_possible.update(scope_at_line.get_variables())
+                all_possible.update(scope_at_line.get_methods())
+                all_possible.update(scope_at_line.get_types())                
 
                 if match in all_possible:
                     all_possible.remove(match) #Don't include the match
