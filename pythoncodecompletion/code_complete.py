@@ -429,8 +429,14 @@ class Completer(object):
         self._active_parser = None
         
     def parse_file(self, name, file_content, line):
-        self._parsers[name] = FileParser(file_content, current_line=line)
-        self._active_parser = name
+        try:
+            parser = FileParser(file_content, current_line=line)
+        except (IndentationError, tokenize.TokenError):
+            pass
+        else:
+            self._parsers[name] = parser
+        if name in self._parsers:
+            self._active_parser = name
     
     def get_completions(self, match):
     	"""
@@ -439,7 +445,9 @@ class Completer(object):
     	"""
     	
         print("Completing: " + match)
-        
+        if not self._active_parser:
+            return []
+            
         parser = self._parsers[self._active_parser]
         scope_at_line = parser.get_active_scope()
         
@@ -488,8 +496,8 @@ class Completer(object):
                         
         return sorted(list(set(matches)))
 
+c = Completer()
 def complete(file_content, match, line):
-    c = Completer()
     c.parse_file("test", file_content, line)
     return [ { 'abbr' : x } for x in c.get_completions(match) ]
 
