@@ -86,6 +86,15 @@ class Scope(object):
                 #FIXME: look up class scope
                 pass                
         return set(result)        
+
+    def get_modules(self):
+        result = list(self.modules)
+        for scope in self.inherited_scopes:
+            if isinstance(scope, Scope):
+                result.extend(scope.get_modules())
+            else:
+                pass
+        return set(result)
     
 class ObjectScope(Scope):
     def __init__(self, parent):
@@ -272,6 +281,31 @@ class FileParser(object):
         self._parse_to_end()
 
 
+    def _parse_from_import(self):
+        pass
+        
+    def _parse_import(self):
+        tokens = self._parse_to_end()
+        last_token = None
+        rename_last_token_to_next_token = False
+        for tok_type, token in tokens:
+            if token in [","]:
+                continue
+            elif token == "as" and last_token:
+                rename_last_token_to_next_token = True
+                continue
+            elif rename_last_token_to_next_token:
+                #If the last token was "as" then we rename the token before to the new name
+                self._current_scope.modules.remove(last_token)
+                self._current_scope.modules.add(token)
+                self._current_scope.children[token] = self._current_scope.children[last_token]
+                del self._current_scope.children[last_token]
+                rename_last_token_to_next_token = False
+            else:
+                self._current_scope.modules.add(token)
+                self._current_scope.children[token] = ObjectScope(parent=self._current_scope)
+            last_token = token
+
     def _parse_statement(self, lvalue_type, lvalue):
         """ FIXME handle multiple lvalues"""
         
@@ -392,6 +426,10 @@ class FileParser(object):
                     print("Pushing dedent: %s" % True)
                     self._dedent_stack.append(True)
                     self._parse_method()
+                elif token == "from":
+                    self._parse_from_import()
+                elif token == "import":
+                    self._parse_import()
                 elif token in KEYWORDS_THAT_INHERIT_SCOPE:                   
                     tokens = self._parse_to_end()
                     token_types = [x[0] for x in tokens ]
@@ -457,6 +495,7 @@ class Completer(object):
         all_possible.update(scope_at_line.get_variables())
         all_possible.update(scope_at_line.get_methods())
         all_possible.update(scope_at_line.get_types())        
+        all_possible.update(scope_at_line.get_modules())
     
         if match in all_possible:
             all_possible.remove(match) #Don't include the match
@@ -467,6 +506,7 @@ class Completer(object):
         global_matches.update(parser.get_global_scope().get_variables())
         global_matches.update(parser.get_global_scope().get_methods())
         global_matches.update(parser.get_global_scope().get_types())
+        global_matches.update(parser.get_global_scope().get_modules())
         
         if match in global_matches:
             global_matches.remove(match) #Don't include the match        
@@ -484,7 +524,8 @@ class Completer(object):
                 all_possible = set()
                 all_possible.update(scope_at_line.get_variables())
                 all_possible.update(scope_at_line.get_methods())
-                all_possible.update(scope_at_line.get_types())                
+                all_possible.update(scope_at_line.get_types())
+                all_possible.update(scope_at_line.get_modules())
 
                 if match in all_possible:
                     all_possible.remove(match) #Don't include the match
