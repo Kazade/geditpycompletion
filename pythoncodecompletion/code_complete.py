@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright (C) 2011 Luke Benstead
 #
@@ -18,10 +18,10 @@
 
 """ A code completion parser for Python """
 
-from StringIO import StringIO
+from io import StringIO
 import tokenize
 import keyword
-import __builtin__
+import builtins
 
 from token import DEDENT, NEWLINE
 
@@ -45,8 +45,8 @@ class Scope(object):
         self.keywords = set()
         
         if scope_type == ScopeType.MODULE:
-            self.methods = set([ x for x in dir(__builtin__) if __builtins__.get(x).__class__ == isinstance.__class__ ])
-            self.types = set([ x for x in dir(__builtin__) if isinstance(__builtins__.get(x), type) ])
+            self.methods = set([ x for x in dir(builtins) if __builtins__.get(x).__class__ == isinstance.__class__ ])
+            self.types = set([ x for x in dir(builtins) if isinstance(__builtins__.get(x), type) ])
             self.keywords = set(keyword.kwlist)
         self.modules = set()
         self.inherited_scopes = set()
@@ -181,7 +181,7 @@ class FileParser(object):
             tok_type, token, line = self._get_next_token()
             
             if tok_type == tokenize.COMMENT:
-                print "COMMENT"
+                #print("COMMENT")
                 ignore_rest = True
             
             if not ignore_rest:
@@ -199,7 +199,7 @@ class FileParser(object):
         self._current_scope.types.add(class_name) #Store this class as a type
         self._current_scope.children[class_name] = class_scope
         self._current_scope = class_scope
-        print "New scope: %s at line %s" % (self._current_scope.name, self._line_no)
+        #print("New scope: %s at line %s" % (self._current_scope.name, self._line_no))
         tokens = self._parse_to_end()
 
         #We have an open bracket, this means the class has parents
@@ -234,7 +234,7 @@ class FileParser(object):
         self._current_scope.children[method_name] = method_scope
         self._current_scope = method_scope
         
-        print "New scope: %s at line %s" % (self._current_scope.name, self._line_no)
+        #print("New scope: %s at line %s" % (self._current_scope.name, self._line_no))
 
         tokens = self._parse_to_end()
         
@@ -250,7 +250,7 @@ class FileParser(object):
             first_token_type, first_token = tokens[0]            
             
             tokens = tokens[1:] #Remove from the tokens list
-            print "CLASS VAR: ", class_scope.name, first_token
+            #print("CLASS VAR: ", class_scope.name, first_token)
             
             #add it to the variables list
             self._current_scope.variables.add(first_token)
@@ -331,12 +331,14 @@ class FileParser(object):
             if is_assignment_to_member:
                 class_scope = self._find_parent_scope_of_type(ScopeType.CLASS)
                 if not class_scope:
-                    print("Don't understand this: " + str(tokens))
+                    #print("Don't understand this: " + str(tokens))
                     if self._current_scope:
-                        print(self._current_scope.name)
-                        print(self._current_scope.parent.name)
+                        #print(self._current_scope.name)
+                        #print(self._current_scope.parent.name)
+                        pass
                     else:
-                        print("NO CURRENT SCOPE!")
+                        #print("NO CURRENT SCOPE!")
+                        pass
                     return 
                 else:
                     scope = class_scope
@@ -358,7 +360,8 @@ class FileParser(object):
                 elif rvalue_tokens[0][0] == tokenize.STRING:
                     scope.children[lvalue_name] = StrScope(self._current_scope)
             else:
-                print "TODO: Handle assignment: ", lvalue_tokens, "=", rvalue_tokens
+                #print("TODO: Handle assignment: ", lvalue_tokens, "=", rvalue_tokens)
+                pass
 
     def _find_parent_scope_of_type(self, scope_type):
         current = self._current_scope
@@ -376,14 +379,15 @@ class FileParser(object):
         if to_dedent:
             if self._current_scope.parent:
                 self._current_scope = self._current_scope.parent
-                print "New scope: %s at line %s" % (self._current_scope.name, self._line_no)
+                #print("New scope: %s at line %s" % (self._current_scope.name, self._line_no))
         else:
-            print "Ignoring dedent at %s" % self._line_no
+            #print("Ignoring dedent at %s" % self._line_no)
+            pass
     
     def _get_next_token(self):
         while True:
-            tok_type, token, (lineno, indent), end, line = self._gen.next()    	
-            print token
+            tok_type, token, (lineno, indent), end, line = next(self._gen)    	
+            #print(token)
             if token == "\n" or tok_type == tokenize.NEWLINE: 
                 self._line_no += 1
             elif "\n" in token:
@@ -409,7 +413,7 @@ class FileParser(object):
             try:
                 tok_type, token, line = self._get_next_token()
                                 
-#                print line, lineno, self._current_line
+#                print(line, lineno, self._current_line)
                 if self._current_line == self._line_no:
                     self._active_scope = self._current_scope
 
@@ -419,11 +423,11 @@ class FileParser(object):
                 elif tok_type == tokenize.STRING:
                     self._parse_to_end()
                 elif token == "class":
-                    print("Pushing dedent: %s" % True)                
+                    #print("Pushing dedent: %s" % True)                
                     self._dedent_stack.append(True)
                     self._parse_class()
                 elif token == "def":
-                    print("Pushing dedent: %s" % True)
+                    #print("Pushing dedent: %s" % True)
                     self._dedent_stack.append(True)
                     self._parse_method()
                 elif token == "from":
@@ -438,15 +442,15 @@ class FileParser(object):
                         colon_idx = token_types.index(tokenize.COLON)
                         tokens_after_colon = [ x for x in token_types[colon_idx+1:] if x not in (tokenize.NEWLINE,) ]
                         if len(tokens_after_colon):
-                            print "IF LINE: ", tokens_after_colon
+                            #print("IF LINE: ", tokens_after_colon)
                             block_finished = True 
-                    print("Pushing dedent: %s" % block_finished)
+                    #print("Pushing dedent: %s" % block_finished)
                     self._dedent_stack.append(block_finished)
                     
                 elif token in KEYWORDS_THAT_ARE_IGNORED:
                     self._parse_to_end()
                 elif token in keyword.kwlist:
-                    print "Unhandled keyword: '" + token + "'"
+                    #print("Unhandled keyword: '" + token + "'")
                     self._parse_to_end()
                 else:
                     if token.strip():
@@ -477,12 +481,12 @@ class Completer(object):
             self._active_parser = name
     
     def get_completions(self, match):
-    	"""
+        """
     		Get the completions for match, using the location of the
     		current_line to detect the current scope
     	"""
     	
-        print("Completing: " + match)
+        #print("Completing: " + match)
         if not self._active_parser:
             return []
             
@@ -491,7 +495,7 @@ class Completer(object):
         
         parts = match.split(".")
         all_possible = set()
-        print "Scope: " + scope_at_line.name
+        #print("Scope: " + scope_at_line.name)
         all_possible.update(scope_at_line.get_variables())
         all_possible.update(scope_at_line.get_methods())
         all_possible.update(scope_at_line.get_types())        
@@ -518,7 +522,7 @@ class Completer(object):
         for part in parts:        
             if part in all_possible and part in scope_at_line.children:
                 scope_at_line = scope_at_line.children[part]
-                print "Looking at scope: " + scope_at_line.name                
+                #print("Looking at scope: " + scope_at_line.name)
                 matches = []
                 
                 all_possible = set()
@@ -586,11 +590,11 @@ if __name__ == '__main__':
     """
     
     matches = complete(sample, "va", 6)
-    print "Matches are: %s" % matches
+    #print("Matches are: %s" % matches)
     matches = complete(sample, "se", 6)
-    print "Matches are: %s" % matches
+    #print("Matches are: %s" % matches)
     matches = complete(sample, "self.", 6)
-    print "Matches are: %s" % matches
+    #print("Matches are: %s" % matches)
 
     parser = FileParser(sample)
     global_scope = parser.get_global_scope()

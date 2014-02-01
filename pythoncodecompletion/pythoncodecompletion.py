@@ -18,13 +18,13 @@
 
 from gi.repository import GObject, Gedit, Gtk, GtkSource
 import re
-from code_complete import complete
+from .code_complete import complete
 
 class PythonCompletionProvider(GObject.Object, GtkSource.CompletionProvider):
     __gtype_name__ = 'PythonCompletionProvider'
 
-    re_alpha = re.compile(r"\w+", re.UNICODE | re.MULTILINE)
-    re_non_alpha = re.compile(r"\W+", re.UNICODE | re.MULTILINE)
+    re_alpha = re.compile("\w+", re.UNICODE | re.MULTILINE)
+    re_non_alpha = re.compile("\W+", re.UNICODE | re.MULTILINE)
 
     def __init__(self, view):
         GObject.Object.__init__(self)
@@ -41,22 +41,22 @@ class PythonCompletionProvider(GObject.Object, GtkSource.CompletionProvider):
         start = insert.copy()
 
         while start.backward_char():
-            char = unicode(start.get_char())
+            char = start.get_char()
             if not self.re_alpha.match(char) and not char == ".":
                 start.forward_char()
                 break
 
-        incomplete = unicode(doc.get_text(start, insert, True))
+        incomplete = doc.get_text(start, insert, True)
         if not incomplete:
             return []
         
-        print "Finding match for: " + incomplete
+        #print("Finding match for: " + incomplete)
         if incomplete.isdigit():
-            print "Result is a digit, ignoring"
+            #print("Result is a digit, ignoring")
             return []
             
         line = insert.get_line()
-        print "... on line: %s" % line
+        #print("... on line: %s" % line)
         completes = complete( doc.get_text(*(list(doc.get_bounds()) + [True])), incomplete, line)
         if not completes:
             return []
@@ -79,7 +79,7 @@ class PythonCompletionProvider(GObject.Object, GtkSource.CompletionProvider):
         return result
     
     def do_populate(self, context):
-        print "provider_populate called"
+        #print("provider_populate called")
         proposals = self._get_proposals(context)
         context.add_proposals(self, proposals, True)
         
@@ -87,7 +87,7 @@ class PythonCompletionProvider(GObject.Object, GtkSource.CompletionProvider):
         return context.get_iter().get_buffer().get_mime_type() == 'text/x-python'
 
     def do_get_priority(self):
-        print "get_priority"
+        #print("get_priority")
         return 0
 
 GObject.type_register(PythonCompletionProvider)
@@ -100,7 +100,7 @@ class CompletionPlugin(GObject.Object, Gedit.WindowActivatable):
     window = GObject.property(type=Gedit.Window)
     
     def __init__(self):
-        print("Constructing plugin")
+        #print("Constructing plugin")
         
         GObject.Object.__init__(self)
         
@@ -119,34 +119,28 @@ class CompletionPlugin(GObject.Object, Gedit.WindowActivatable):
     
     def do_activate(self):
         """Activate plugin."""
-        print("Activating plugin")
+        #print("Activating plugin")
         
-        handler_ids = []
+        self._handlers = []
         callback = self.on_tab_added
         handler_id = self.window.connect("tab-added", callback)
-        handler_ids.append(handler_id)
+        self._handlers.append(handler_id)
 
         callback = self.on_tab_removed
         handler_id = self.window.connect("tab-removed", callback)
-        handler_ids.append(handler_id)        
+        self._handlers.append(handler_id)
         
-        self.window.set_data(self.name, handler_ids)
         for view in self.window.get_views():
             self._add_provider(view)
             
-        print("Activation complete")
+        #print("Activation complete")
 
     def do_deactivate(self):
         """Deactivate plugin."""
 
-        widgets = [self.window]
-        widgets.extend(self.window.get_views())
-        widgets.extend(self.window.get_documents())
-        for widget in widgets:
-            handler_ids = widget.get_data(self.name)
-            for handler_id in handler_ids:
-                widget.disconnect(handler_id)
-            widget.set_data(self.name, None)
+        for handler_id in self._handlers:
+            self.window.disconnect(handler_id)
+        self._handlers = None
 
     def on_tab_added(self, window, tab, data=None):
         """Connect the document and view in tab."""
